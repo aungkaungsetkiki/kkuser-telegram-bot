@@ -3,8 +3,8 @@ import logging
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
-# Bot Token (Hardcoded)
-TOKEN = "8137695051:AAEpjJo-IV-nzHOXA_pt0cFCWyHBn03Doyg"
+# Bot Token (Hardcoded)TOK
+TOKEN = os.getenv("BOT_TOKEN")
 
 # မှတ်တမ်းများသိမ်းဆည်းခြင်း
 logging.basicConfig(
