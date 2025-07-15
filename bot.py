@@ -44,7 +44,7 @@ message_store = {}
 overbuy_selections = {}
 break_limit = None
 
-# OCR Function to extract text from image
+## OCR Function to extract text from image
 async def extract_text_from_image(image_path):
     try:
         # Preprocess image for better OCR
@@ -53,19 +53,10 @@ async def extract_text_from_image(image_path):
             logger.error("Failed to read image")
             return None
             
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
-        
-        # Use Tesseract OCR (for English + Numbers)
-        custom_config = r'--oem 3 --psm 6'
-        text_tesseract = pytesseract.image_to_string(thresh, config=custom_config)
-        
-        # Use EasyOCR (for Myanmar language)
+        # Use only EasyOCR for Myanmar language
         text_easyocr = reader.readtext(image_path, detail=0)
-        text_easyocr = ' '.join(text_easyocr)
+        extracted_text = ' '.join(text_easyocr)
         
-        # Combine results
-        extracted_text = f"{text_tesseract}\n{text_easyocr}"
         return extracted_text.strip()
     except Exception as e:
         logger.error(f"OCR Error: {e}")
