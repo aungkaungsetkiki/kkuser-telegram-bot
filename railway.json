@@ -2,7 +2,7 @@
   "build": {
     "builder": "NIXPACKS",
     "config": {
-      "aptPackages": ["tesseract-ocr", "tesseract-ocr-mya", "libtesseract-dev"]
+      "aptPackages": ["tesseract-ocr", "tesseract-ocr-mya"]
     }
   }
 }
