@@ -2,7 +2,13 @@
   "build": {
     "builder": "NIXPACKS",
     "config": {
-      "aptPackages": ["tesseract-ocr", "tesseract-ocr-mya"]
+      "nixpacksPlanVersion": 1
+    }
+  },
+  "deploy": {
+    "startCommand": "python bot.py",
+    "restartPolicy": {
+      "type": "ALWAYS"
     }
   }
 }
