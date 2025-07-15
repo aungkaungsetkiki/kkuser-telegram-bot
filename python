@@ -1,0 +1,2 @@
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+reader = easyocr.Reader(['my'])
