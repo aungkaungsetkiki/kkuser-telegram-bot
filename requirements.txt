@@ -1,6 +1,6 @@
-python-telegram-bot==20.3
+python-telegram-bot[socks]==20.3
 pytesseract==0.3.10
-pillow==10.1.0
+Pillow==10.1.0
 opencv-python-headless==4.8.1.78
 numpy==1.26.1
 easyocr==1.7.1
