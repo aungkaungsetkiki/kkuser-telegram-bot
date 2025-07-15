@@ -7,9 +7,19 @@ from telegram.ext import (
 )
 from datetime import datetime, time
 import pytz
+import pytesseract
+from PIL import Image
+import cv2
+import numpy as np
+import easyocr
+import re
 
 # Environment variable
 TOKEN = os.getenv("BOT_TOKEN")
+
+# OCR Setup (Tesseract + EasyOCR for Myanmar language)
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+reader = easyocr.Reader(['my'])  # Myanmar language support
 
 # Logging
 logging.basicConfig(
@@ -33,6 +43,29 @@ overbuy_list = {}
 message_store = {}
 overbuy_selections = {}
 break_limit = None
+
+# OCR Function to extract text from image
+async def extract_text_from_image(image_path):
+    try:
+        # Preprocess image for better OCR
+        img = cv2.imread(image_path)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+        
+        # Use Tesseract OCR (for English + Numbers)
+        custom_config = r'--oem 3 --psm 6'
+        text_tesseract = pytesseract.image_to_string(thresh, config=custom_config)
+        
+        # Use EasyOCR (for Myanmar language)
+        text_easyocr = reader.readtext(image_path, detail=0)
+        text_easyocr = ' '.join(text_easyocr)
+        
+        # Combine results
+        extracted_text = f"{text_tesseract}\n{text_easyocr}"
+        return extracted_text.strip()
+    except Exception as e:
+        logger.error(f"OCR Error: {e}")
+        return None
 
 def reverse_number(n):
     s = str(n).zfill(2)
@@ -94,29 +127,13 @@ async def dateclose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Ledger closed for {key}")
     await update.message.reply_text(f"✅ {key} စာရင်းပိတ်လိုက်ပါပြီ")
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def process_bet_text(text, update: Update):
     try:
-        user = update.effective_user
-        text = update.message.text
-        
-        if not user or not user.username:
-            await update.message.reply_text("❌ ကျေးဇူးပြု၍ Telegram username သတ်မှတ်ပါ")
-            return
-
-        key = get_current_date_key()
-        if not date_control.get(key, False):
-            await update.message.reply_text("❌ စာရင်းပိတ်ထားပါသည်")
-            return
-
-        if not text:
-            await update.message.reply_text("⚠️ မက်ဆေ့ဂျ်မရှိပါ")
-            return
-
         if any(c in text for c in ['%', '&', '*', '$']):
             await update.message.reply_text("⚠️ မှားနေပါတယ်\nအထူးသင်္ကေတများ (%&*$) မပါရပါ\nဥပမာ: 12-500")
-            return
+            return None, None
 
-        entries = text.split()
+        entries = re.split(r'\s+', text.strip())
         bets = []
         total_amount = 0
 
@@ -124,6 +141,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         while i < len(entries):
             entry = entries[i]
             
+            # Handle number pairs (12 34 5000)
             if i + 2 < len(entries):
                 if (entries[i].isdigit() and entries[i+1].isdigit() and entries[i+2].isdigit()):
                     num1 = int(entries[i])
@@ -137,6 +155,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         i += 3
                         continue
             
+            # Handle slash format (12/34/56/1000)
             if '/' in entry:
                 parts = entry.split('/')
                 if len(parts) >= 3 and all(p.isdigit() for p in parts):
@@ -149,6 +168,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     i += 1
                     continue
             
+            # Handle basic bet (12-500)
             if '-' in entry and 'r' not in entry:
                 parts = entry.split('-')
                 if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
@@ -160,6 +180,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         i += 1
                         continue
             
+            # Handle reverse bet (12r500)
             if 'r' in entry and '-' not in entry:
                 parts = entry.split('r')
                 if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
@@ -173,6 +194,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         i += 1
                         continue
             
+            # Handle reverse with different amounts (12-500r1000)
             if 'r' in entry and '-' in entry:
                 main_part, r_part = entry.split('r', 1)
                 if '-' in main_part:
@@ -189,6 +211,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             i += 1
                             continue
             
+            # Handle separate reverse format (12 500r1000)
             if entry.isdigit() and i+1 < len(entries) and 'r' in entries[i+1]:
                 num = int(entry)
                 r_part = entries[i+1]
@@ -205,6 +228,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             i += 2
                             continue
             
+            # Handle combination bets (အခွေ, အပူးပါအခွေ)
             if 'အခွေ' in entry or 'အပူးပါအခွေ' in entry:
                 base = entry.replace('အခွေ', '').replace('အပူးပါ', '')
                 if base.isdigit() and len(base) >= 2:
@@ -231,6 +255,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         i += 2
                         continue
             
+            # Handle special bet types
             fixed_special_cases = {
                 "အပူး": [0, 11, 22, 33, 44, 55, 66, 77, 88, 99],
                 "ပါဝါ": [5, 16, 27, 38, 49, 50, 61, 72, 83, 94],
@@ -248,6 +273,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     i += 2
                     continue
             
+            # Handle dynamic bet types (ထိပ်, ပိတ်, ဘရိတ်, အပါ)
             dynamic_types = ["ထိပ်", "ပိတ်", "ဘရိတ်", "အပါ"]
             found_dynamic = False
             for dtype in dynamic_types:
@@ -279,6 +305,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if found_dynamic:
                 continue
             
+            # Handle simple number (default amount 500)
             if entry.isdigit():
                 num = int(entry)
                 if 0 <= num <= 99:
@@ -294,6 +321,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     continue
             
             i += 1
+
+        return bets, total_amount
+    except Exception as e:
+        logger.error(f"Error processing bet text: {e}")
+        await update.message.reply_text("⚠️ အချက်အလက်များကိုစစ်ဆေးပါ")
+        return None, None
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        user = update.effective_user
+        if not user or not user.username:
+            await update.message.reply_text("❌ ကျေးဇူးပြု၍ Telegram username သတ်မှတ်ပါ")
+            return
+
+        key = get_current_date_key()
+        if not date_control.get(key, False):
+            await update.message.reply_text("❌ စာရင်းပိတ်ထားပါသည်")
+            return
+
+        # Handle image input
+        if update.message.photo:
+            photo = await update.message.photo[-1].get_file()
+            image_path = f"temp_{update.message.message_id}.jpg"
+            await photo.download_to_drive(image_path)
+            
+            extracted_text = await extract_text_from_image(image_path)
+            os.remove(image_path)  # Clean up
+            
+            if not extracted_text:
+                await update.message.reply_text("❌ စာမဖတ်နိုင်ပါ၊ စာသားရိုက်ထည့်ပေးပါ")
+                return
+            
+            await update.message.reply_text(f"📄 ဖတ်လို့ရတဲ့စာ:\n{extracted_text}")
+            text = extracted_text
+        else:
+            text = update.message.text
+            if not text:
+                await update.message.reply_text("⚠️ မက်ဆေ့ဂျ်မရှိပါ")
+                return
+
+        bets, total_amount = await process_bet_text(text, update)
+        if not bets:
+            return
 
         if user.username not in user_data:
             user_data[user.username] = {}
@@ -313,8 +383,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup(keyboard)
             sent_message = await update.message.reply_text(response, reply_markup=reply_markup)
             message_store[(user.id, update.message.message_id)] = (sent_message.message_id, bets, total_amount)
-        else:
-            await update.message.reply_text("⚠️ အချက်အလက်များကိုစစ်ဆေးပါ")
             
     except Exception as e:
         logger.error(f"Error in handle_message: {str(e)}")
@@ -1032,7 +1100,8 @@ if __name__ == "__main__":
 
     # Message handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, comza_text))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_message))  # For image input
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # For text input
 
-    logger.info("🚀 Bot is starting...")
+    logger.info("🚀 Bot is starting with OCR support...")
     app.run_polling()
