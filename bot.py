@@ -49,6 +49,10 @@ async def extract_text_from_image(image_path):
     try:
         # Preprocess image for better OCR
         img = cv2.imread(image_path)
+        if img is None:
+            logger.error("Failed to read image")
+            return None
+            
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
         
@@ -1100,8 +1104,8 @@ if __name__ == "__main__":
 
     # Message handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, comza_text))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_message))  # For image input
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # For text input
+    app.add_handler(MessageHandler(filters.PHOTO, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("🚀 Bot is starting with OCR support...")
     app.run_polling()
