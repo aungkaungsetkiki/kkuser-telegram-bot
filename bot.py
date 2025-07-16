@@ -1066,6 +1066,6 @@ if __name__ == "__main__":
     # Message handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-
+     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, comza_text))
     logger.info("🚀 Bot is starting...")
     app.run_polling()
