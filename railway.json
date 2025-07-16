@@ -1,14 +1,7 @@
 {
   "build": {
-    "builder": "NIXPACKS",
-    "config": {
-      "nixpacksPlanVersion": 1
-    }
-  },
-  "deploy": {
-    "startCommand": "python bot.py",
-    "restartPolicy": {
-      "type": "ALWAYS"
-    }
+    "builder": "nixpacks",
+    "buildCommand": "nixpacks build",
+    "startCommand": "python bot.py"
   }
 }
