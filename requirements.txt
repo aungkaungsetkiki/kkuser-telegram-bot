@@ -1,8 +1,5 @@
-python-telegram-bot[socks]==20.3
+python-telegram-bot==20.3
+pytz==2023.3
 pytesseract==0.3.10
 Pillow==10.1.0
-opencv-python-headless==4.8.1.78
-numpy==1.26.1
-easyocr==1.7.1
-pytz==2023.3.post1
 python-dotenv==1.0.0
